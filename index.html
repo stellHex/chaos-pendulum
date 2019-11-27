@@ -1,0 +1,881 @@
+<head><title>Experimental Study of Chaos in a Driven Pendulum: The Movie</title></head>
+<body>
+<div style="
+  min-height: 600px;
+  height: 95vh;
+  display: grid;
+  grid-template-columns: min-content minmax(200px, 1fr);
+  grid-template-rows: min-content 1fr;
+  grid-template-areas: 'canvas controls' 'canvas description';
+">
+  <canvas width=1000 height=600 id="canvas" style="grid-area: canvas;"></canvas>
+  <div style="grid-area: controls;">
+    <div class="checkbox"><input type="checkbox" id="show-poincare" checked/> Show Poincare Section</div>
+    <div class="checkbox"><input type="checkbox" id="show-state1" checked/> Show Example 1</div>
+    <div class="checkbox"><input type="checkbox" id="show-state2"/> Show Example 2</div>
+    <div class="checkbox"><input type="checkbox" id="show-state3"/> Show Example 3</div>
+    <div class="checkbox"><input type="checkbox" id="show-positions" checked/> Show Angle Indicators</div>
+    <div class="checkbox"><input type="checkbox" id="show-velocities"/> Show Velocity Indicators</div>
+    <div class="checkbox"><input type="checkbox" id="animate-velocities"/> Animate Velocity Indicators</div>
+    <div class="checkbox"><input type="checkbox" id="reduce-lag" checked/> Reduce Lag</div>
+    <div class="checkbox"><input type="checkbox" id="repeat" checked/> Repeat</div>
+    <div class="checkbox"><input type="checkbox" id="circularize"/> Circularize</div>
+    <div style="
+      display: grid;
+      grid-template-columns: repeat(10, 15px);
+      grid-gap: 2px;
+      justify-items: stretch;
+    ">
+      <div style="grid-column-end: span 3;">t = </div>
+      <input id="time" type="number" step="0.01" style="grid-column-end: span 7;"/>
+      <button id="prev-cycle" title="Previous Cycle">◀◀▮</button>
+      <button id="slow-down" title="Slow Down">▶▮</button>
+      <button id="pause" title="Pause">▮▮</button>
+      <button id="speed-up" title="Speed Up">▶▶</button>
+      <button id="prev-frame" title="Previous Frame" class="hidden">◀▮</button>
+      <button id="play" title="Play" class="hidden">▶</button>
+      <button id="next-frame" title="Next Frame" class="hidden">▮▶</button>
+      <button id="next-cycle" title="Next Cycle">▮▶▶</button>
+      <div id="fps" style="grid-column-end: span 10; text-align: center; font-size: small"></div>
+    </div>
+  </div>
+  <div style="
+    grid-area: description;
+    font-size: 80%;
+    position: relative;
+    transform: scale(1, 1);
+    overflow-y: scroll;
+    margin: 0 5px
+  ">
+    <h2>Chaos in a Driven Pendulum</h2>
+    <p>
+      This is a visualization of a <a target="_blank" href="http://www.sciencedirect.com/science/article/pii/0167278987902387">
+      1987 chaos theory paper</a>, concerning a certain high school-sounding physics setup.
+      A pendulum is affected by three angular forces: friction, gravity,
+      and a torque that varies sinusoidally in time (which is to say, first it goes one way, then the other).
+      In the experiment from the paper, they use a motor to apply the third force,
+      which for some reason is called the "kick".
+    </p>
+    <p>
+      These three forces all interacting with each other create an unsolvable system of equations,
+      which makes the position of the pendulum completely unpredictable in the long term.
+    </p>
+    <p>
+      The graph is a plot of the state of the pendulum in phase space.
+      A "graph in phase space" is just physics jargon for "the x axis isn't time".
+      Here, the angle is on the horizontal axis and angular velocity on the vertical axis.
+      The top means going fast counterclockwise, and the bottom means going fast clockwise.
+      Stare at the animation for a bit, play around with the controls, and it should click.
+    </p>
+    <p>
+      By now you might be wondering what the deal with the swirly bit is.
+      First, imagine tracing the pendulum's state on the graph over time.
+      Better yet, just <button id="trace-demo">click here</button> to see what that looks like.
+      Interesting at the start, but eventually it'll just fill in the whole space.
+    </p>
+    <p>
+      But what happens if we record the state of the pendulum <span class="italic">only</span> when the kick is 0?
+      <button id="section-demo">This happens.</button> Yep, it's the familiar swirly bit!
+      Once you run the simulation for long enough (which isn't even very long),
+      the state of the pendulum when the kick is a certain value
+      will always correspond to a point inside the swirly bit for that particular kick.
+    </p>
+    <p>
+      Taking such a phase space sample at the characteristic frequency of the periodic system under consideration (whew!)
+      is called a Poincare section, after Henri Poincare.
+      It's one of the best-known ways to extract some predictions from a chaotic system, and certainly among the prettiest.
+      <!-- The figure is also called a "strange attractor" -->
+    </p>
+    <h2 class="border" style="bottom: calc(100% - 1em + 1px); background: linear-gradient(#fff, #fff8 80%, #fff0);"></h2>
+    <h2 class="border" style="bottom: -1px; background: linear-gradient(#fff0, #fff8 80%, #fff);"></h2>
+  </div>
+</div>
+<style>
+  * { font-family: Menlo, Consolas, 'Courier New', Courier, monospace; }
+  .hidden { display: none !important; }
+  button {
+    grid-column-end: span 2;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  div.checkbox { position: relative; }
+  input[type="checkbox"], button:not(:disabled) { cursor: pointer; }
+  .italics { font-style: italic; }
+  h2 { margin-top: 0.83em; margin-bottom: 0.5em; }
+  h2.border {
+    margin: 0;
+    position: sticky;
+    left: 0;
+    height: 1em;
+    width: 100%;
+  }
+  input[type="checkbox"]::after {
+    content: '';
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+  }
+</style>
+<script>
+/* globals HTMLElement */
+
+// with props to James Gliek's "Chaos", and a paper which has the following metadata:
+// {
+//   "journal":"Physica D: Nonlinear Phenomena",
+//   "issue":"Volume 26, Issues 1–3, May–June 1987, Pages 385-395",
+//   "title":"Experimental study of chaos in a driven pendulum",
+//   "authors":["James A.Blackburn", "YangZhou-jing", "S.Vik", "H.J.T.Smith", "M.A.H.Nerenberg"],
+//   "uri":"http://www.sciencedirect.com/science/article/pii/0167278987902387"
+// }
+
+/* * * * * * *\
+*    SETUP    *
+\* * * * * * */
+
+let pi = Math.PI
+let { max, min, abs, sign, floor, round, sin, cos, sqrt, atan2, log2 } = Math
+// let identity = new DOMMatrixReadOnly()
+function getEl (el) {
+  return el instanceof HTMLElement ? el
+    : document.getElementById(el)
+}
+function vectorize (f, dontUnpack = []) {
+  // returns a function which does the same thing as f but unpacks array args first and returns a flat array
+  // for example,
+  //     func = vectorize((a, b, c) => a * b + c)
+  //     func([[1, 2],[3]], 2, [0.1, 0.5]) // returns [2.1, 2.5, 4.1, 4.5, 6.1, 6.5]
+  function vecf (i, args) {
+    if (i >= args.length) return [f(...args)]
+    if (dontUnpack.includes(i)) return vecf(f, args, dontUnpack, i + 1)
+    if (Array.isArray(args[i])) {
+      let result = []
+      args[i].forEach(val => result.push(
+        ...vecf(i, args.map((arg, j) => j !== i ? arg : val))
+      ))
+      return result
+    }
+    return vecf(i + 1, args)
+  }
+  return (...args) => vecf(0, args)
+}
+
+// creates a rectangular 2d array stored inside of a Float32Array
+function createDataLine (datumLength, maxLength, prepop = null, preend = null) {
+  let raw, end
+  if (prepop) {
+    raw = prepop
+    end = preend == null ? raw.length : preend
+  } else {
+    raw = new Float32Array(datumLength * maxLength)
+    end = 0
+  }
+  return {
+    get raw () { return raw },
+    get end () { return end },
+    get datumLength () { return datumLength },
+    get maxLength () { return maxLength },
+    get length () { return end / datumLength },
+
+    get (i) { return this.raw.subarray(datumLength * i, datumLength * (i + 1)) },
+    set (i, datum) { raw.set(datum, i * datumLength) },
+    push (datum) {
+      try {
+      // if (datum.length !== datumLength) console.warn(`Pushing inappropriate datum ${datum}!`)
+        raw.set(datum, end)
+        end += datumLength
+      } catch (e) {
+        console.log(maxLength, datumLength, this.length, datum)
+        throw e
+      }
+    },
+    slice (start = 0, end = this.length) {
+      let rawStart = start * datumLength
+      let rawEnd = end * datumLength
+      return createDataLine(datumLength, end - start, raw.subarray(rawStart, rawEnd))
+    },
+    reduce (f, v0) {
+      let i, acc
+      if (v0 === undefined) {
+        i = 1; acc = this.get(0)
+      } else {
+        i = 0; acc = v0
+      }
+      for (; i < this.length; i++) {
+        acc = f(acc, this.get(i), i, this)
+      }
+      return acc
+    }
+  }
+}
+
+let cvs = document.getElementById('canvas')
+let ctx = cvs.getContext('2d')
+ctx.translate(30, 10)
+ctx.lineWidth = 2
+ctx.imageSmoothingEnabled = false
+
+let screen = {
+  xpx: 50, //       size of one radian on angle axis in pixels
+  vpx: 2, //        size of one radian/sec on angular velocity axis in pixels
+  v0h: 150, //      the 0 point of the angular velocity axis in pixels
+  frate: 50, //     framerate in fps
+  maxfrate: 100, // max framerate. frate can exceed this but animate() will attempt to spoof it
+  loop: 1, //       loop length in seconds
+  _times: 3, //     how many times to repeat the graph
+  get cycle () { return this.frate * this.loop }, // loop length in frames
+  frateParity: 0 // used to make frame rate be a nice number, not super important
+}
+bind(screen, 'times', 'repeat', 'checked', t => t, t => t > 1, r => r ? 3 : 1)
+
+let wrap = {
+  _wrap: false,
+  r: 150,
+  vpx: undefined,
+  colorCode: false,
+  colors: {
+    [-1]: 'red',
+    0: 'black',
+    1: 'black'
+  },
+  vmode: {
+    linear () {
+      wrap.r = 150
+      wrap.colorCode = true
+      wrap.vpx = v => v * screen.vpx * 2
+    },
+    linearabs () {
+      wrap.r = 150
+      wrap.colorCode = false
+      wrap.vpx = v => abs(v * screen.vpx * 2)
+    },
+    invert () {
+      wrap.r = 150
+      wrap.colorCode = false
+      wrap.vpx = v => v >= 0 ? v * screen.vpx + wrap.r : wrap.r / (1 - v * screen.vpx / screen.v0h)
+    },
+    compress () {
+      wrap.r = 150
+      wrap.colorCode = false
+      wrap.vpx = v => wrap.r + wrap.r * (v * screen.vpx / screen.v0h) / (1 + abs(v * screen.vpx / screen.v0h))
+    },
+    snuggle () {
+      wrap.r = 250
+      wrap.colorCode = true
+      wrap.vpx = v => 2000 * wrap.r / (2000 + (v) ** 2)
+    }
+  },
+  center: [cvs.height / 2, cvs.height / 2]
+}
+wrap.vmode.linear()
+bind(wrap, 'wrap', 'circularize', 'checked', val => {
+  let repeat = getEl('repeat')
+  if (val) {
+    ctx.save()
+    ctx.resetTransform()
+    ctx.translate(...wrap.center)
+    repeat._checked = repeat.checked
+    repeat.checked = false
+  } else {
+    ctx.restore()
+    repeat.checked = repeat._checked
+  }
+  repeat.disabled = val
+  return val
+})
+
+/* * * * * * *\
+*   PHYSICS   *
+\* * * * * * */
+
+let ticks = 1000000
+
+let main = {
+  force () {
+    let { system, state } = this
+    let kick = system.kick(state.t)
+    let gravity = system.g * cos(state.x)
+    let friction = -state.v * system.f
+    return kick + gravity + friction
+  },
+  tick () {
+    let { system, state, data } = this
+    // data[state.t % system.p].push(new Float32Array([state.x, state.v]))
+    data[state.t % system.p].push([state.x, state.v])
+    state.x += state.v / system.p
+    state.x = state.x > 0 ? state.x % (2 * pi) : (2 * pi + state.x) % (2 * pi)
+    state.v += this.force()
+    state.t += 1
+  },
+  system: {
+    g: 1.0, // gravity
+    f: 0.00514255, // friction
+    k: 1.01, // kick strength
+    p: 200, // period (temporal resolution)
+    kick (t) {
+      let result = this.k * sin(2 * pi * (t % this.p) / this.p)
+      return abs(result) > 1e-9 ? result : 0
+    }
+  },
+  state: {
+    x: pi, // angular position
+    v: 0.0, // angular velocity (in radians per system.p ticks)
+    t: 0.0 // time
+  },
+  data: undefined
+}
+main.data = Array(main.system.p).fill(0).map(e => createDataLine(2, ticks / main.system.p))
+
+ctx.font = '50px sans-serif'
+ctx.fillText('Calculating...', 50, cvs.height / 2 - 25)
+
+// putting this in a timeout ensures all other code runs first
+// and that 'Calculating...' is rendered
+window.setTimeout(() => {
+  for (let i = 0; i < ticks; i++) { main.tick() }
+  manager.animate()
+}, 100)
+
+function maxV (data, invalidate = false) {
+  if (!data) return null
+  if (!data._maxV || invalidate) {
+    data._maxV = max(
+      data.reduce((a, b) => max(a, b.reduce((a, b) => max(a, b[1]), 0)), 0),
+      abs(data.reduce((a, b) => min(a, b.reduce((a, b) => min(a, b[1]), 0)), 0))
+    )
+  }
+  return data._maxV
+}
+
+/* * * * * * *\
+*   CONTROL   *
+\* * * * * * */
+
+let timeouts = {}
+function animate (key, timeout, iterf, framef = () => {}, excess = 0) {
+  let minTimeout = 1000 / screen.freight
+  if (timeout < minTimeout) {}
+  let to = isNaN(timeout) ? timeout() : timeout
+  timeouts[key] = setTimeout(() => {
+    animate(key, timeout, falways)
+  }, to)
+}
+
+let manager = {
+  managed: main,
+  _n: 0,
+  get t () { return this.n / this.managed.system.p },
+
+  clearAll () { Object.keys(timeouts).forEach(k => clearTimeout(timeouts[k])) },
+  clear () { clearTimeout(timeouts['main']) },
+  animate () {
+    manager.clearAll()
+    animate('main', () => 1000 / screen.frate, function () {
+      this.render()
+      this.n++
+    }.bind(this))
+  },
+  render () { renderEverything(this.managed, this.n) }
+}
+// manager's `n` is measured in simulation steps, but `t` is measured in simulation periods
+bind(manager, 'n', 'time', 'value',
+  n => max(0, n),
+  n => (n / manager.managed.system.p).toFixed(3),
+  t => round(t * manager.managed.system.p)
+)
+
+/* * * * * * *\
+*     DOM     *
+\* * * * * * */
+
+// Should I just use Vue? Yes.
+// Is this more fun? Also yes.
+function should (id) { return getEl(id).checked }
+function updateDOM (id, val, key = 'value') { getEl(id)[key] = val }
+function listen (id, e, f) { getEl(id).addEventListener(e, f) }
+function hideshow (id, force) { getEl(id).classList.toggle('hidden', force) }
+// `preprocess` can do validation, but also onChange things
+function bind (obj, prop, id, attr = 'value', preprocess = val => val, jsToDOM = val => val, domToJS = val => val) {
+  Object.defineProperty(obj, prop, {
+    configurable: true,
+    enumerable: true,
+    get () { return obj['_' + prop] },
+    set (val) {
+      val = preprocess(val)
+      obj['_' + prop] = val
+      updateDOM(id, jsToDOM(val), attr)
+    }
+  })
+  listen(id, 'change', e => { obj[prop] = domToJS(e.target[attr]) })
+  // (setting an element's value thankfully doesn't trigger the change event)
+}
+
+// buttons buttons buttons
+listen('pause', 'click', e => {
+  manager.clearAll()
+  vectorize(hideshow)([e.target, 'slow-down', 'speed-up'], true)
+  vectorize(hideshow)(['play', 'prev-frame', 'next-frame'], false)
+})
+listen('play', 'click', e => {
+  manager.animate()
+  vectorize(hideshow)([e.target, 'prev-frame', 'next-frame'], true)
+  vectorize(hideshow)(['pause', 'slow-down', 'speed-up'], false)
+})
+listen('prev-cycle', 'click', e => {
+  manager.n -= manager.managed.system.p
+  manager.render()
+})
+listen('prev-frame', 'click', e => {
+  manager.n -= 1
+  manager.render()
+})
+listen('next-frame', 'click', e => {
+  manager.n++
+  manager.render()
+})
+listen('next-cycle', 'click', e => {
+  manager.n += manager.managed.system.p
+  manager.render()
+})
+listen('slow-down', 'click', e => {
+  screen.frate /= sqrt(2)
+  screen.frateParity = !screen.frateParity
+  if (screen.frateParity) screen.frate = +screen.frate.toFixed(5)
+  updateFPS()
+})
+listen('speed-up', 'click', e => {
+  screen.frate *= sqrt(2)
+  if (screen.frateParity) screen.frate = +screen.frate.toFixed(5)
+  screen.frateParity = !screen.frateParity
+  updateFPS()
+})
+function updateFPS () { updateDOM('fps', `${round(screen.frate)}fps`, 'innerText') }
+updateFPS()
+
+// we need to see velocities to see animated velocities
+listen('animate-velocities', 'change', e => {
+  if (e.target.checked) getEl('show-velocities').checked = true
+})
+
+// whenever time is changed or a checkbox is toggled, rerender
+listen('time', 'change', e => {
+  manager.render()
+})
+vectorize(listen)(
+  Array.from(document.querySelectorAll('input[type=checkbox]')),
+  'change', manager.render.bind(manager)
+)
+
+// demo buttons
+listen('trace-demo', 'click', e => {
+  getEl('pause').click()
+  let data = manager.managed.data
+  let p = manager.managed.system.p
+  let n = p * 4
+  setTimeout(() => {
+    animate('trace-demo', 1000.0 / screen.frate, function () {
+      clear()
+      renderAxes(data, n / data.length)
+      renderSlice(data, p * 4, n)
+      renderState(main, n, '#00f')
+      n += 2
+    })
+  }, 1)
+  timeouts['trace-demo-check'] = setInterval(() => {
+    if (n > p * 16) {
+      clearInterval(timeouts['trace-demo-check'])
+      clearTimeout(timeouts['trace-demo'])
+      timeouts['trace-demo-reset'] = setTimeout(() => manager.render(), 6000)
+    }
+  }, 100)
+})
+listen('section-demo', 'click', e => {
+  getEl('pause').click()
+  let data = manager.managed.data
+  let p = manager.managed.system.p
+  let n = p * 4 - 20
+  let delta = 1
+  setTimeout(() => {
+    animate('section-demo', 1000.0 / screen.frate, function () {
+      clear()
+      renderAxes(data, n / data.length)
+      renderSection(data, 0, screen.times, 4, floor(n / p) + 1, 5)
+      renderState(main, n, '#00f')
+
+      n += floor(delta)
+      if (p * 5 > delta && delta > 25) n += p - n % p
+      delta =
+        delta < 2 ? delta + 0.005
+        : delta < 25 ? delta * 1.02 // eslint-disable-line indent
+        : p * 5 // eslint-disable-line indent
+
+      if (delta > 25) drawFastForwardBox(3)
+      else if (delta > 2) drawFastForwardBox(2)
+    })
+  }, 1)
+  timeouts['section-demo-check'] = setInterval(() => {
+    if (n > p * 800) {
+      clearInterval(timeouts['section-demo-check'])
+      clearTimeout(timeouts['section-demo'])
+      let polished = false
+      animate('section-demo-1', 500, function () {
+        clear()
+        renderAxes(data, n / data.length)
+        if (polished) renderSection(data, 0)
+        else renderSection(data, 0, screen.times, 4, floor(n / p) + 1, 5)
+        polished = !polished
+        renderState(main, n, '#00f')
+      })
+      timeouts['section-demo-stop'] = setTimeout(() => { clearTimeout(timeouts['section-demo-1']) }, 4000)
+      timeouts['section-demo-reset'] = setTimeout(() => { manager.clearAll(); manager.render() }, 12000)
+    }
+  }, 100)
+})
+
+/* * * * * * *\
+*   DRAWING   *
+\* * * * * * */
+
+function clear () { ctx.clearRect(-cvs.height, -cvs.width, cvs.height * 3, cvs.width * 3) }
+
+// drawFoo draws the literal graphical thing Foo
+// renderBar draws a representation of more abstract concept Bar
+
+function renderEverything (stuff, n) {
+  // let froll = frame / screen.cycle
+  // let n = round(froll * data.length)
+  let data = stuff.data
+  let froll = n / data.length
+  clear()
+  renderAxes(data, froll)
+  if (should('show-poincare')) renderSection(data, n, screen.times, should('reduce-lag') ? 3000 : undefined)
+  if (should('show-state1')) renderState(stuff, n, '#00f', 0)
+  if (should('show-state2')) renderState(stuff, n + 10000, '#08f', 1)
+  if (should('show-state3')) renderState(stuff, n + 20000, '#0c6', 2)
+}
+
+function renderSection (data, n, times = screen.times, start = 500, end = undefined, size = undefined) {
+  n = n % data.length
+  let slice = data[n].slice(start, end)
+  // debugger
+  for (let i = 0; i < slice.length; i++) {
+    let point = slice.get(i)
+    for (let l = 0; l < times; l++) {
+      drawPoint(...point, l, size)
+    }
+  }
+}
+
+function renderSlice (data, n0, n1, times = screen.times) {
+  let frame0 = n0 % data.length
+  let frame1 = n1 % data.length
+  let cycle0 = floor(n0 / data.length)
+  let cycle1 = floor(n1 / data.length)
+  for (let i = 0; i < data.length; i++) {
+    let c0 = cycle0 + +(frame0 >= i)
+    let c1 = cycle1 + +(i <= frame1)
+    for (let j = c0; j < c1; j++) {
+      // for (let k = 0; k < times; k++) drawPoint(...data[i][j], k, 10)
+      for (let k = 0; k < times; k++) drawPoint(...data[i].get(j), k, 10)
+    }
+  }
+}
+
+function renderAxes (data, t, times = screen.times) {
+  if (should('show-velocities')) for (let j = -3; j <= 3; j++) renderVelocity(j * maxV(data) / 3, t, times)
+  if (should('show-positions')) for (let j = 0; j < 4; j++) renderPosition(data, j * pi / 2, times)
+}
+function renderVelocity (v, t, times = screen.times, scale = pi * screen.xpx / 3) { // scale = abs(v * 2) + 5)
+  let { vpx, v0h, xpx } = screen
+  ctx.save()
+  if (v) ctx.filter = 'invert(1) sepia(1) saturate(1000%) invert(1)'
+  ctx.globalAlpha = 0.5
+
+  if (wrap.wrap) {
+    let r = wrap.vpx(v)
+    if (r <= 0) {
+      ctx.restore(); return
+    }
+    if (v && should('animate-velocities')) {
+      scale *= log2(r)
+      // make sure the dashes fit evenly into the circumference
+      let invscale = 3 + floor(r * 2 * pi / 3 / scale)
+      scale = r * 2 * pi / 3 / invscale
+      ctx.setLineDash([scale * 2, scale])
+    }
+    ctx.rotate(t * v)
+    ctx.beginPath()
+    ctx.arc(0, 0, r, 0, 2 * pi)
+    ctx.stroke()
+  } else {
+    if (v && should('animate-velocities')) {
+      let offset = ((t * v * xpx) % (scale * 3) + scale * 3) % (scale * 3)
+      // |(----)(--)|
+      if (offset < scale) ctx.setLineDash([0, offset, scale * 2, scale - offset])
+      // |~~        |
+      // |-)(----)(-|
+      else ctx.setLineDash([offset - scale, scale, scale * 3 - offset, 0])
+      // |~~~~~~~~  |
+      // |---)(--)(-|
+      // ctx.setLineDash([scale * 2, scale])
+      // ctx.strokeStyle = dottedLine
+    }
+
+    ctx.beginPath()
+    let y = v0h + v * vpx
+    ctx.moveTo(0, y)
+    ctx.lineTo(xpx * 2 * pi * times, y)
+    ctx.stroke()
+  }
+
+  ctx.restore()
+}
+function renderPosition (data, x, times = screen.times) {
+  let { vpx, v0h, xpx } = screen
+  if (wrap.wrap) {
+    let r = wrap.r * 2
+    ctx.save()
+    ctx.strokeStyle = '#0004'
+
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
+    ctx.lineTo(r * cos(x), r * sin(x))
+    ctx.stroke()
+
+    ctx.restore()
+  } else {
+    let top = -maxV(data) * vpx + v0h - 1
+    let bottom = maxV(data) * vpx + v0h + 30
+    if (x === 0) times++
+    for (let l = 0; l < times; l++) {
+      let xx = (x + 2 * pi * l) * xpx
+
+      ctx.save()
+      ctx.strokeStyle = '#0004'
+
+      ctx.beginPath()
+      ctx.moveTo(xx, top)
+      ctx.lineTo(xx, bottom)
+      ctx.stroke()
+
+      ctx.restore()
+
+      drawPendulum(xx, bottom + 30, x)
+    }
+  }
+}
+
+function renderState ({ data, system }, n, color, whichTime = 0, times = screen.times) {
+  n = n % (data.length * data[data.length - 1].length)
+  let section = data[n % system.p]
+  // let state = section[floor(n / system.p) % section.length]
+  let state = section.get(floor(n / system.p) % section.length)
+  ctx.save()
+
+  // state point
+  ctx.fillStyle = color
+  ctx.fillStyle += 'c0' // canvas context autoconverts to #RRGGBB
+  for (let time = 0; time < times; time++) drawPoint(...state, time, 10)
+
+  let kick = system.kick(n) / system.k
+  // let gravity = system.g * cos(state.x)
+  // let friction = -state.v * system.f
+
+  // pendulum
+  ctx.fillStyle = color
+  ctx.strokeStyle = color
+  let x, y
+  let otherArgs = { v: state[1], t: n / system.p, k: kick, g: true }
+  if (wrap.wrap) {
+    x = 0; y = 0
+    otherArgs.r = wrap.r
+    otherArgs.skeleton = true
+  } else {
+    let r = pi / 2 * screen.xpx
+    x = 3 * r + whichTime * 4 * r
+    y = maxV(data) * screen.vpx + screen.v0h + 30 + 30 + 20 + 30 + r
+    otherArgs.r = r
+  }
+  drawPendulum(x, y, state[0], otherArgs)
+  ctx.restore()
+}
+
+function drawPoint (phi, v, offset = 0, side = 1) {
+  let x, y
+  if (wrap.wrap) {
+    ctx.save()
+    if (wrap.colorCode && ctx.fillStyle === '#000000') ctx.fillStyle = wrap.colors[sign(v)]
+    let r = wrap.vpx(v)
+    x = cos(phi) * r
+    y = sin(phi) * r
+    ctx.fillRect(x - side / 2, y - side / 2, side, side)
+    ctx.restore()
+  } else {
+    x = (phi + offset * 2 * pi) * screen.xpx
+    y = v * screen.vpx + screen.v0h
+    ctx.fillRect(x - side / 2, y - side / 2, side, side)
+  }
+}
+
+function drawPendulum (x, y, phi, { v, t, k, g, r, skeleton } = { v: 0, t: null, k: 0, g: false, r: 20, skeleton: false }) {
+  // if no input position, use phi = omega * t
+  if (phi === null) phi = v * t //
+  let lineScale = 2 + (r - 20) / 20
+
+  ctx.save()
+
+  // bob path
+  ctx.save()
+  ctx.lineWidth = lineScale
+  ctx.strokeStyle = '#0004'
+  ctx.beginPath()
+  ctx.arc(x, y, r, 0, pi * 2)
+  ctx.stroke()
+  ctx.restore()
+
+  let endX = x + cos(phi) * r
+  let endY = y + sin(phi) * r
+  // kick (k should be scaled so that abs of maximum k is 1)
+  if (k) {
+    ctx.save()
+
+    let kangle = k * pi / 2
+    ctx.strokeStyle = 'red'
+    ctx.fillStyle = 'red'
+    ctx.lineWidth = lineScale
+    ctx.lineWidth *= 2 + 6 * abs(k)
+    let lw = ctx.lineWidth
+
+    ctx.translate(x, y)
+    ctx.scale(0.4, 0.4)
+    ctx.rotate(phi)
+    if (skeleton) {
+      ctx.translate(0, sign(k) * lineScale / 2 / 0.4)
+    } else {
+      ctx.beginPath()
+      ctx.arc(0, 0, r, 0, kangle, k < 0)
+      ctx.stroke()
+      ctx.rotate(kangle)
+    }
+    drawArrowhead(r, 0, pi / 2 * sign(k), lw * 1.5, lw * 2.5)
+
+    ctx.restore()
+  }
+
+  if (skeleton) {
+    let sideX = lineScale / 2 * sin(phi)
+    let sideY = lineScale / 2 * -cos(phi)
+    let barX = x + (endX - x) * 0.8
+    let barY = y + (endY - y) * 0.8
+
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.lineTo(x + sideX, y + sideY)
+    ctx.lineTo(barX + sideX, barY + sideY)
+    pathArcFromCenterEndpoints([endX, endY], [barX + sideX, barY + sideY], [barX - sideX, barY - sideY])
+    ctx.lineTo(x - sideX, y - sideY)
+    ctx.lineTo(x, y)
+    ctx.stroke()
+  } else {
+    ctx.lineWidth = lineScale
+    // rod
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.lineTo(endX, endY)
+    ctx.stroke()
+
+    // bob
+    ctx.beginPath()
+    ctx.arc(endX, endY, r / 5, 0, pi * 2)
+    ctx.fill()
+  }
+
+  ctx.restore()
+}
+
+function drawArrowhead (x, y, phi, l = 10, w = 8, offset = 1) {
+  let front = l * offset
+  let back = l * (offset - 1)
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(phi)
+  ctx.beginPath()
+  ctx.moveTo(front, 0)
+  ctx.lineTo(back, w / 2)
+  ctx.lineTo(back, -w / 2)
+  ctx.fill()
+  ctx.restore()
+}
+
+function drawFastForwardBox (count = 2) {
+  ctx.save()
+  let l = 60
+  let w = 40
+  let x = l * (1 - count) / 2
+  let y = 0
+  let boxX = l * (count) / 2
+  let boxY = w * 0.75
+  let boxRB = w
+  let boxRS = 5
+  let rightEnd = [boxX + boxRB, boxY + boxRS]
+  let bottomEnd = [boxX + boxRS, boxY + boxRB]
+  let rightCenter = intercept([boxX, boxY], rightEnd, 0)
+  let bottomCenter = intercept([boxX, boxY], bottomEnd, 1)
+  ctx.resetTransform()
+  ctx.translate(cvs.width - boxX - boxRB * 2, cvs.height - boxY - boxRB * 2)
+  // draw curvy rectangle
+  ctx.fillStyle = '#0004'
+  ctx.beginPath()
+  let xSign = (i) => i < 3 || i > 6 ? 1 : -1
+  let ySign = (i) => i < 1 || i > 4 ? -1 : 1
+  let centerPoints = Array(8).fill(0).map((_, i) => {
+    // every other arc is a corner/side; every fourth arc is horizontal side/vertical side
+    let [x, y] = i % 2 ? [boxX, boxY] : i % 4 ? [0, bottomCenter] : [rightCenter, 0]
+    return [x * xSign(i), y * ySign(i)]
+  })
+  let endPoints = Array(8).fill(0).map((_, i) => {
+    //   6       7
+    // 5           0
+    // 4           1
+    //   3       2
+    let [x, y] = i % 4 < 2 ? rightEnd : bottomEnd
+    return [x * xSign(i), y * ySign(i)]
+  })
+  centerPoints.forEach((center, i) => {
+    pathArcFromCenterEndpoints(center, endPoints[i], endPoints[(i + 1) % 8])
+  })
+  // leaving these here for posterity
+  // pathArcFromCenterEndpoints([rightCenter, 0], [rightX, -rightY], [rightX, rightY])
+  // pathArcFromCenterEndpoints([boxX, boxY], [rightX, rightY], [bottomX, bottomY])
+  // pathArcFromCenterEndpoints([0, bottomCenter], [bottomX, bottomY], [-bottomX, bottomY])
+  // pathArcFromCenterEndpoints([-boxX, boxY], [-bottomX, bottomY], [-rightX, rightY])
+  // pathArcFromCenterEndpoints([-rightCenter, 0], [-rightX, rightY], [-rightX, -rightY])
+  // pathArcFromCenterEndpoints([-boxX, -boxY], [-rightX, -rightY], [-bottomX, -bottomY])
+  // pathArcFromCenterEndpoints([0, -bottomCenter], [-bottomX, -bottomY], [bottomX, -bottomY])
+  // pathArcFromCenterEndpoints([boxX, -boxY], [bottomX, -bottomY], [rightX, -rightY])
+  ctx.fill()
+
+  // let btoom
+  ctx.fillStyle = '#fff'
+  for (let i = 0; i < count; i++) drawArrowhead(x + l * i, y, 0, l, w, 0.5)
+  ctx.restore()
+}
+
+function intercept ([x0, y0], [x1, y1], xory) {
+  if (xory !== 0 && xory !== 1) return undefined
+  let m = (y0 - y1) / (x0 - x1)
+  if (isNaN(m)) return undefined
+  // let isY = xory
+  // if (abs(m) === Infinity) return isY ? Infinity : x0
+  // else if (m === 0) return isY ? y0 : Infinity
+  // else return isY ? y0 - x0 * m : x0 - y0 / m
+  return [[x0 - y0 / m, y0 - x0 * m], [x0, Infinity], [Infinity, y0]][(m * 2 === m) + !m][xory]
+}
+
+function pathArcFromCenterEndpoints ([xc, yc], [x0, y0], [x1, y1], ccw) {
+  let r = sqrt((x0 - xc) ** 2 + (y0 - yc) ** 2)
+  let start = atan2(y0 - yc, x0 - xc)
+  let end = atan2(y1 - yc, x1 - xc)
+  ctx.arc(xc, yc, r, start, end, ccw)
+}
+</script>
+</body>
