@@ -351,12 +351,11 @@ function maxV (data, invalidate = false) {
 \* * * * * * */
 
 let timeouts = {}
-function animate (key, timeout, iterf, framef = () => {}, excess = 0) {
-  let minTimeout = 1000 / screen.freight
-  if (timeout < minTimeout) {}
+function animate (key, timeout, f) {
+  f()
   let to = isNaN(timeout) ? timeout() : timeout
   timeouts[key] = setTimeout(() => {
-    animate(key, timeout, falways)
+    animate(key, timeout, f)
   }, to)
 }
 
