@@ -52,37 +52,39 @@
       This is a visualization of a <a target="_blank" href="http://www.sciencedirect.com/science/article/pii/0167278987902387">
       1987 chaos theory paper</a>, concerning a certain high school-sounding physics setup.
       A pendulum is affected by three angular forces: friction, gravity,
-      and a torque that varies sinusoidally in time (which is to say, first it goes one way, then the other).
+      and an external torque that varies sinusoidally in time
+      (which is to say, first it goes one way, then the other).
       In the experiment from the paper, they use a motor to apply the third force,
       which for some reason is called the "kick".
     </p>
     <p>
       These three forces all interacting with each other create an unsolvable system of equations,
-      which makes the position of the pendulum completely unpredictable in the long term.
+      which makes the position of the pendulum almost completely unpredictable in the long term.
     </p>
     <p>
       The graph is a plot of the state of the pendulum in phase space.
-      A "graph in phase space" is just physics jargon for "the x axis isn't time".
-      Here, the angle is on the horizontal axis and angular velocity on the vertical axis.
+      A "graph in phase space" is just physics jargon for "a graph the x axis isn't time".
+      Here, the x axis is the <span class="italic">angle</span>, and the y axis is the angular velocity.
       The top means going fast counterclockwise, and the bottom means going fast clockwise.
       Stare at the animation for a bit, play around with the controls, and it should click.
     </p>
     <p>
       By now you might be wondering what the deal with the swirly bit is.
       First, imagine tracing the pendulum's state on the graph over time.
-      Better yet, just <button id="trace-demo">click here</button> to see what that looks like.
+      Better yet, just <button id="trace-demo">&nbsp;click here&nbsp;</button> to see what that looks like.
       Interesting at the start, but eventually it'll just fill in the whole space.
     </p>
     <p>
-      But what happens if we record the state of the pendulum <span class="italic">only</span> when the kick is 0?
-      <button id="section-demo">This happens.</button> Yep, it's the familiar swirly bit!
+      But what happens if we record the state of the pendulum
+      <span class="italic">only</span> when the kick is the maximum?
+      <button id="section-demo">&nbsp;This happens.&nbsp;</button> Yep, it's the familiar swirly bit!
       Once you run the simulation for long enough (which isn't even very long),
       the state of the pendulum when the kick is a certain value
       will always correspond to a point inside the swirly bit for that particular kick.
     </p>
     <p>
       Taking such a phase space sample at the characteristic frequency of the periodic system under consideration (whew!)
-      is called a Poincare section, after Henri Poincare.
+      is called a Poincare section, after Henri Poincare, a prolific mathematician of the late 1800s and early 1900s.
       It's one of the best-known ways to extract some predictions from a chaotic system, and certainly among the prettiest.
       <!-- The figure is also called a "strange attractor" -->
     </p>
@@ -491,21 +493,27 @@ listen('section-demo', 'click', e => {
   getEl('pause').click()
   let data = manager.managed.data
   let p = manager.managed.system.p
-  let n = p * 4 - 20
+  let p4 = floor(p / 4)
+  let n = floor(p * 4.25 - 20)
   let delta = 1
   setTimeout(() => {
     animate('section-demo', 1000.0 / screen.frate, function () {
       clear()
       renderAxes(data, n / data.length)
-      renderSection(data, 0, screen.times, 4, floor(n / p) + 1, 5)
+      renderSection(data, p4, screen.times, 4.25, floor(n / p - 0.25) + 1, 5)
       renderState(main, n, '#00f')
 
       n += floor(delta)
-      if (p * 5 > delta && delta > 25) n += p - n % p
+      // when going at hyperspeed, specifically show max kick state
+      if (p * 5 > delta && delta > 25) n += p - (n % p) + p4
+      // progressively increase delta until floor(delta) exceeds 2
+      // then speed up exponentially until delta is 25, then jump to p * 5
+      /* eslint-disable indent */
       delta =
-        delta < 2 ? delta + 0.005
+        delta < 2 ? delta + 0.0025
         : delta < 25 ? delta * 1.02 // eslint-disable-line indent
         : p * 5 // eslint-disable-line indent
+      /* eslint-enable indent */
 
       if (delta > 25) drawFastForwardBox(3)
       else if (delta > 2) drawFastForwardBox(2)
@@ -519,8 +527,8 @@ listen('section-demo', 'click', e => {
       animate('section-demo-1', 500, function () {
         clear()
         renderAxes(data, n / data.length)
-        if (polished) renderSection(data, 0)
-        else renderSection(data, 0, screen.times, 4, floor(n / p) + 1, 5)
+        if (polished) renderSection(data, p4)
+        else renderSection(data, p4, screen.times, 4.25, floor(n / p - 0.25) + 1, 5)
         polished = !polished
         renderState(main, n, '#00f')
       })
