@@ -6,9 +6,9 @@
   <canvas width=1000 height=600 id="canvas" style="grid-area: canvas;"></canvas>
   <div style="grid-area: controls;">
     <div class="checkbox"><input type="checkbox" id="show-poincare" checked/> Show Poincare Section</div>
-    <div class="checkbox"><input type="checkbox" id="show-state1" checked/> Show Example 1</div>
-    <div class="checkbox"><input type="checkbox" id="show-state2"/> Show Example 2</div>
-    <div class="checkbox"><input type="checkbox" id="show-state3"/> Show Example 3</div>
+    <div class="checkbox"><input type="checkbox" id="show-state1" checked/> Show Example Pendulum 1</div>
+    <div class="checkbox"><input type="checkbox" id="show-state2"/> Show Example Pendulum 2</div>
+    <div class="checkbox"><input type="checkbox" id="show-state3"/> Show Example Pendulum 3</div>
     <div class="checkbox"><input type="checkbox" id="show-positions" checked/> Show Angle Indicators</div>
     <div class="checkbox"><input type="checkbox" id="show-velocities"/> Show Velocity Indicators</div>
     <div class="checkbox"><input type="checkbox" id="animate-velocities"/> Animate Velocity Indicators</div>
@@ -21,8 +21,8 @@
       grid-gap: 2px;
       justify-items: stretch;
     ">
-      <div style="grid-column-end: span 3;">t = </div>
-      <input id="time" type="number" step="0.01" style="grid-column-end: span 7;"/>
+      <div style="grid-column-end: span 4;">time = </div>
+      <input id="time" type="number" step="0.01" style="grid-column-end: span 6;"/>
       <button id="prev-cycle" title="Previous Cycle">◀◀▮</button>
       <button id="slow-down" title="Slow Down">▶▮</button>
       <button id="pause" title="Pause">▮▮</button>
@@ -59,14 +59,15 @@
     <p>
       By now you might be wondering what the deal with the swirly bit is.
       First, imagine tracing the pendulum's state on the graph over time.
-      Better yet, just <button id="trace-demo">&nbsp;click here&nbsp;</button> to see what that looks like.
+      Better yet, just <button id="trace-demo" class="text-button">&nbsp;click here&nbsp;</button> to see what that looks like.
       Interesting at the start, but eventually it'll just fill in the whole space.
     </p>
     <p>
       But what happens if we record the state of the pendulum
       <span class="italic">only</span> when the kick is the maximum?
-      <button id="section-demo">&nbsp;This happens.&nbsp;</button> Yep, it's the familiar swirly bit!
-      Once you run the simulation for long enough (which isn't even very long),
+      <button id="section-demo" class="text-button">&nbsp;This happens.&nbsp;</button> Yep, it's the familiar swirly bit!
+      Once you run the simulation for long enough (which isn't even very long;
+      see <button id="t-equals-0" class="text-button">&nbsp;time = 0&nbsp;</button>!),
       the state of the pendulum when the kick is a certain value
       will always correspond to a point inside the swirly bit for that particular kick.
     </p>
@@ -557,6 +558,12 @@ listen('section-demo', 'click', e => {
       timeouts['section-demo-reset'] = setTimeout(() => { manager.clearAll(); manager.render() }, 12000)
     }
   }, 100)
+})
+listen('t-equals-0', 'click', e => {
+  manager.n = 0
+  getEl('show-state1').checked = true
+  getEl('show-state2').checked = false
+  getEl('show-state3').checked = false
 })
 
 /* * * * * * *\
