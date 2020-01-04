@@ -1,13 +1,8 @@
+<!doctype html>
+<html>
 <head><title>Experimental Study of Chaos in a Driven Pendulum: The Movie</title></head>
 <body>
-<div style="
-  min-height: 600px;
-  height: 95vh;
-  display: grid;
-  grid-template-columns: min-content minmax(200px, 1fr);
-  grid-template-rows: min-content 1fr;
-  grid-template-areas: 'canvas controls' 'canvas description';
-">
+<div class="main-wrapper">
   <canvas width=1000 height=600 id="canvas" style="grid-area: canvas;"></canvas>
   <div style="grid-area: controls;">
     <div class="checkbox"><input type="checkbox" id="show-poincare" checked/> Show Poincare Section</div>
@@ -39,14 +34,7 @@
       <div id="fps" style="grid-column-end: span 10; text-align: center; font-size: small"></div>
     </div>
   </div>
-  <div style="
-    grid-area: description;
-    font-size: 80%;
-    position: relative;
-    transform: scale(1, 1);
-    overflow-y: scroll;
-    margin: 0 5px
-  ">
+  <div class="description">
     <h2>Chaos in a Driven Pendulum</h2>
     <p>
       This is a visualization of a <a target="_blank" href="http://www.sciencedirect.com/science/article/pii/0167278987902387">
@@ -95,6 +83,39 @@
 <style>
   * { font-family: Menlo, Consolas, 'Courier New', Courier, monospace; }
   .hidden { display: none !important; }
+  .main-wrapper {
+    min-height: 600px;
+    height: 95vh;
+    display: grid;
+    grid-template-columns: min-content minmax(200px, 1fr);
+    grid-template-rows: min-content 1fr;
+    grid-template-areas:
+      'canvas controls'
+      'canvas description';
+  }
+  .description {
+    grid-area: description;
+    font-size: 80%;
+    position: relative;
+    transform: scale(1, 1);
+    overflow-y: scroll;
+    margin: 0 5px;
+  }
+  @media (max-width: 1250px) {
+    .main-wrapper {
+      grid-template-columns: max-content minmax(200px, 1fr);
+      grid-template-rows: unset;
+      grid-template-rows: unset;
+      grid-template-areas:
+        'canvas canvas'
+        'controls description';
+    }
+  }
+  @media (max-width: 750px) {
+    .main-wrapper {
+      grid-template-columns: min-content 1fr;
+    }
+  }
   button {
     grid-column-end: span 2;
     padding-left: 0;
@@ -886,3 +907,4 @@ function pathArcFromCenterEndpoints ([xc, yc], [x0, y0], [x1, y1], ccw) {
 }
 </script>
 </body>
+</html>
